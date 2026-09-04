@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="tr">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
+    <title>Vampir Köylü</title>
+
+</head>
+
+<body>
+
+    <h1>🧛 Vampir Köylü</h1>
+
+
+    <!-- ========================= -->
+    <!-- OYUNA KATIL -->
+    <!-- ========================= -->
+
+    <h2>Oyuna Katıl</h2>
+
+    <input
+        id="username"
+        type="text"
+        placeholder="Kullanıcı adın"
+    >
+
+    <br>
+    <br>
+
+
+    <!-- ODA OLUŞTUR -->
+
+    <button id="createRoom">
+        Oda Oluştur
+    </button>
+
+    <br>
+    <br>
+
+
+    <!-- ODAYA KATIL -->
+
+    <input
+        id="roomCode"
+        type="text"
+        placeholder="Oda kodu"
+    >
+
+    <button id="joinRoom">
+        Odaya Katıl
+    </button>
+
+
+    <p id="message"></p>
+
+    <hr>
+
+
+    <!-- ========================= -->
+    <!-- LOBİ -->
+    <!-- ========================= -->
+
+    <h2>🏠 Lobi</h2>
+
+    <h3 id="currentRoom">
+        Henüz bir odaya girmedin.
+    </h3>
+
+    <p>
+        Oyuncu sayısı:
+        <span id="playerCount">0</span>
+    </p>
+
+
+    <!-- OYUNCULAR -->
+
+    <h3>Oyuncular</h3>
+
+    <ul id="playerList"></ul>
+
+
+    <!-- OYUNU BAŞLAT -->
+
+    <button
+        id="startGameButton"
+        style="display:none;"
+    >
+        🎮 Oyunu Başlat
+    </button>
+
+
+    <hr>
+
+
+    <!-- ========================= -->
+    <!-- CHAT -->
+    <!-- ========================= -->
+
+    <h3>Chat</h3>
+
+    <div id="messages"></div>
+
+    <br>
+
+    <input
+        id="messageInput"
+        type="text"
+        placeholder="Mesaj yaz..."
+    >
+
+    <button id="sendButton">
+        Gönder
+    </button>
+
+
+    <script src="/socket.io/socket.io.js"></script>
+
+    <script>
+
+        const socket = io();
+
+
+        // =========================
+        // ELEMENTLER
+        // =========================
+
+        const usernameInput =
+            document.getElementById("username");
+
+        const roomCodeInput =
+            document.getElementById("roomCode");
+
+        const createRoomButton =
+            document.getElementById("createRoom");
+
+        const joinRoomButton =
+            document.getElementById("joinRoom");
+
+        const message =
+            document.getElementById("message");
+
+        const currentRoom =
+            document.getElementById("currentRoom");
+
+        const playerList =
+            document.getElementById("playerList");
+
+        const playerCount =
+            document.getElementById("playerCount");
+
+        const startGameButton =
+            document.getElementById("startGameButton");
+
+        const messageInput =
+            document.getElementById("messageInput");
+
+        const sendButton =
+            document.getElementById("sendButton");
+
+        const messages =
+            document.getElementById("messages");
+
+
+        // =========================
+        // ODA OLUŞTUR
+        // =========================
+
+        createRoomButton.addEventListener(
+            "click",
+            () => {
+
+                const username =
+                    usernameInput.value.trim();
+
+                if (!username) {
+
+                    message.textContent =
+                        "Önce kullanıcı adını yaz.";
+
+                    return;
+                }
+
+                socket.emit(
+                    "createRoom",
+                    username
+                );
+
+            }
+        );
+
+
+        // =========================
+        // ODAYA KATIL
+        // =========================
+
+        joinRoomButton.addEventListener(
+            "click",
+            () => {
+
+                const username =
+                    usernameInput.value.trim();
+
+                const roomCode =
+                    roomCodeInput.value.trim();
+
+                if (!username || !roomCode) {
+
+                    message.textContent =
+                        "Kullanıcı adı ve oda kodu gerekli.";
+
+                    return;
+                }
+
+                socket.emit(
+                    "joinRoom",
+                    {
+                        username: username,
+                        roomCode: roomCode
+                    }
+                );
+
+            }
+        );
+
+
+        // =========================
+        // ODA OLUŞTURULDU
+        // =========================
+
+        socket.on(
+            "roomCreated",
+            (roomCode) => {
+
+                currentRoom.textContent =
+                    "Oda kodu: " + roomCode;
+
+                message.textContent =
+                    "Oda başarıyla oluşturuldu!";
+
+                roomCodeInput.value =
+                    roomCode;
+
+                // Host olduğu için göster
+                startGameButton.style.display =
+                    "block";
+
+            }
+        );
+
+
+        // =========================
+        // ODAYA KATILINDI
+        // =========================
+
+        socket.on(
+            "joinedRoom",
+            (roomCode) => {
+
+                currentRoom.textContent =
+                    "Oda kodu: " + roomCode;
+
+                message.textContent =
+                    "Odaya katıldın!";
+
+                // Normal oyuncu olduğu için gizle
+                startGameButton.style.display =
+                    "none";
+
+            }
+        );
+
+
+        // =========================
+        // OYUNCU LİSTESİ
+        // =========================
+
+        socket.on(
+            "playerList",
+            (players) => {
+
+                playerList.innerHTML = "";
+
+                playerCount.textContent =
+                    players.length;
+
+                players.forEach(
+                    (player) => {
+
+                        const li =
+                            document.createElement("li");
+
+                        li.textContent =
+                            player.username;
+
+                        playerList.appendChild(li);
+
+                    }
+                );
+
+            }
+        );
+
+
+        // =========================
+        // YENİ HOST
+        // =========================
+
+        socket.on(
+            "newHost",
+            (hostId) => {
+
+                if (socket.id === hostId) {
+
+                    startGameButton.style.display =
+                        "block";
+
+                    message.textContent =
+                        "Oda sahibi artık sensin.";
+
+                }
+
+            }
+        );
+
+
+        // =========================
+        // OYUNU BAŞLAT
+        // =========================
+
+        startGameButton.addEventListener(
+            "click",
+            () => {
+
+                socket.emit(
+                    "startGame"
+                );
+
+            }
+        );
+
+
+        // =========================
+        // OYUN BAŞLADI
+        // =========================
+
+        socket.on("gameStarted", (data) => {
+
+    localStorage.setItem(
+        "gameData",
+        JSON.stringify(data)
+    );
+
+    window.location.href =
+        "/game.html";
+
+});
+
+
+        // =========================
+        // OYUN HATASI
+        // =========================
+
+        socket.on(
+            "gameError",
+            (error) => {
+
+                message.textContent =
+                    error;
+
+            }
+        );
+
+
+        // =========================
+        // CHAT GÖNDER
+        // =========================
+
+        sendButton.addEventListener(
+            "click",
+            () => {
+
+                const text =
+                    messageInput.value.trim();
+
+                if (text === "") {
+                    return;
+                }
+
+                socket.emit(
+                    "chatMessage",
+                    text
+                );
+
+                messageInput.value = "";
+
+            }
+        );
+
+
+        // ENTER İLE CHAT
+
+        messageInput.addEventListener(
+            "keydown",
+            (event) => {
+
+                if (event.key === "Enter") {
+
+                    sendButton.click();
+
+                }
+
+            }
+        );
+
+
+        // =========================
+        // CHAT AL
+        // =========================
+
+        socket.on(
+            "chatMessage",
+            (data) => {
+
+                const newMessage =
+                    document.createElement("p");
+
+                newMessage.textContent =
+                    data.username +
+                    ": " +
+                    data.message;
+
+                messages.appendChild(
+                    newMessage
+                );
+
+            }
+        );
+
+
+        // =========================
+        // ODA HATASI
+        // =========================
+
+        socket.on(
+            "roomError",
+            (error) => {
+
+                message.textContent =
+                    error;
+
+            }
+        );
+
+    </script>
+
+</body>
+
+</html>
