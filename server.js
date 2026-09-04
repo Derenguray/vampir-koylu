@@ -10,13 +10,22 @@ app.use(express.static("public"));
 
 const rooms = {};
 
+// ============================================
+// TOKEN
+// ============================================
 
-// ======================================
+function createPlayerToken() {
+    return (
+        Math.random().toString(36).substring(2) +
+        Date.now().toString(36)
+    );
+}
+
+// ============================================
 // ROLLER
-// ======================================
+// ============================================
 
 function createRoles(playerCount) {
-
     let roles = [];
 
     roles.push("Vampir");
@@ -32,154 +41,165 @@ function createRoles(playerCount) {
 
     // Karıştır
     for (let i = roles.length - 1; i > 0; i--) {
-
         const j = Math.floor(Math.random() * (i + 1));
 
-        [roles[i], roles[j]] =
-            [roles[j], roles[i]];
+        [roles[i], roles[j]] = [roles[j], roles[i]];
     }
 
     return roles;
 }
 
-
-// ======================================
-// YAŞAYAN OYUNCULAR
-// ======================================
+// ============================================
+// OYUNCULAR
+// ============================================
 
 function getAlivePlayers(room) {
-
-    return room.players.filter(
-        player => player.alive
-    );
+    return room.players.filter(player => player.alive);
 }
 
-
-// ======================================
-// OYUNCU LİSTESİ
-// ======================================
+// ============================================
+// OYUNCU LİSTESİ GÖNDER
+// ============================================
 
 function sendPlayers(roomCode) {
-
     const room = rooms[roomCode];
 
     if (!room) {
         return;
     }
 
-    io.to(roomCode).emit(
-        "gamePlayers",
-        room.players.map(player => ({
-            id: player.id,
-            username: player.username,
-            alive: player.alive
-        }))
+    const players = room.players.map(player => ({
+        id: player.id,
+        username: player.username,
+        alive: player.alive
+    }));
+
+    console.log(
+        "OYUNCU LİSTESİ GÖNDERİLİYOR:",
+        roomCode,
+        players
     );
+
+    io.to(roomCode).emit("gamePlayers", players);
 }
 
-
-// ======================================
+// ============================================
 // KAZANMA KONTROLÜ
-// ======================================
+// ============================================
 
 function checkWin(roomCode) {
-
     const room = rooms[roomCode];
 
     if (!room) {
         return true;
     }
 
-    const alive =
-        getAlivePlayers(room);
+    const alive = getAlivePlayers(room);
 
-    const vampires =
-        alive.filter(
-            player => player.role === "Vampir"
-        );
+    const vampires = alive.filter(
+        player => player.role === "Vampir"
+    );
 
-    const villagers =
-        alive.filter(
-            player => player.role !== "Vampir"
-        );
-
+    const villagers = alive.filter(
+        player => player.role !== "Vampir"
+    );
 
     // Vampir kalmadı
     if (vampires.length === 0) {
-
         room.gameStarted = false;
         room.phase = "gameover";
 
-        io.to(roomCode).emit(
-            "gameOver",
-            {
-                winner: "Köylüler"
-            }
-        );
+        if (room.phaseTimer) {
+            clearTimeout(room.phaseTimer);
+        }
+
+        io.to(roomCode).emit("gameOver", {
+            winner: "Köylüler"
+        });
 
         return true;
     }
 
-
-    // Vampirler sayı olarak eşit veya fazla
+    // Vampirler eşit veya fazla
     if (vampires.length >= villagers.length) {
-
         room.gameStarted = false;
         room.phase = "gameover";
 
-        io.to(roomCode).emit(
-            "gameOver",
-            {
-                winner: "Vampirler"
-            }
-        );
+        if (room.phaseTimer) {
+            clearTimeout(room.phaseTimer);
+        }
+
+        io.to(roomCode).emit("gameOver", {
+            winner: "Vampirler"
+        });
 
         return true;
     }
-
 
     return false;
 }
 
-
-// ======================================
-// OYUNCUYA MEVCUT OYUN DURUMUNU GÖNDER
-// ======================================
+// ============================================
+// OYUN DURUMUNU GÖNDER
+// ============================================
 
 function sendGameState(socket) {
-
-    const roomCode =
-        socket.roomCode;
-
-    const room =
-        rooms[roomCode];
+    const roomCode = socket.roomCode;
+    const room = rooms[roomCode];
 
     if (!room) {
-        return;
-    }
-
-
-    const player =
-        room.players.find(
-            p => p.id === socket.id
+        socket.emit(
+            "roomError",
+            "Oda bulunamadı."
         );
 
-
-    if (!player) {
         return;
     }
 
+    const player = room.players.find(
+        p =>
+            p.id === socket.id ||
+            p.token === socket.playerToken
+    );
 
-    // Oyuncunun rolü
-    socket.emit(
-        "gameStarted",
-        {
+    if (!player) {
+        socket.emit(
+            "roomError",
+            "Oyuncu bulunamadı."
+        );
+
+        return;
+    }
+
+    const oldId = player.id;
+
+    // Yeni socket ID
+    player.id = socket.id;
+
+    socket.roomCode = roomCode;
+    socket.username = player.username;
+    socket.playerToken = player.token;
+
+    socket.join(roomCode);
+
+    // Host yeniden bağlandı
+    if (room.host === oldId) {
+        room.host = socket.id;
+
+        console.log(
+            "HOST YENİDEN BAĞLANDI:",
+            player.username
+        );
+    }
+
+    // Oyun başladıysa rolü gönder
+    if (room.gameStarted) {
+        socket.emit("gameStarted", {
             username: player.username,
             role: player.role,
             roomCode: roomCode
-        }
-    );
-
+        });
+    }
 
     // Oyuncular
     socket.emit(
@@ -191,86 +211,60 @@ function sendGameState(socket) {
         }))
     );
 
-
-    // Mevcut faz
+    // Faz
     if (room.phase !== "lobby") {
-
-        socket.emit(
-            "phaseChanged",
-            {
-                phase: room.phase,
-                duration: room.phaseDuration,
-                endTime: room.phaseEndTime
-            }
-        );
+        socket.emit("phaseChanged", {
+            phase: room.phase,
+            duration: room.phaseDuration,
+            endTime: room.phaseEndTime
+        });
     }
 
-
-    // Eğer şu an geceyse yeteneği tekrar gönder
+    // Gece
     if (
         room.phase === "night" &&
         player.alive
     ) {
-
-        socket.emit(
-            "nightStarted",
-            {
-                role: player.role
-            }
-        );
+        socket.emit("nightStarted", {
+            role: player.role
+        });
     }
 
-    // Eğer oylamadaysa oy verme ekranını tekrar gönder
+    // Oylama
     if (
         room.phase === "voting" &&
         player.alive
     ) {
-
-        socket.emit(
-            "votingStarted"
-        );
+        socket.emit("votingStarted");
     }
 }
 
+// ============================================
+// FAZ
+// ============================================
 
-// ======================================
-// FAZ BAŞLAT
-// ======================================
-
-function setPhase(
-    roomCode,
-    phase,
-    duration
-) {
-
-    const room =
-        rooms[roomCode];
+function setPhase(roomCode, phase, duration) {
+    const room = rooms[roomCode];
 
     if (!room) {
         return;
     }
 
-
-    // Önceki timer
     if (room.phaseTimer) {
-
-        clearTimeout(
-            room.phaseTimer
-        );
-
+        clearTimeout(room.phaseTimer);
     }
 
-
-    room.phase =
-        phase;
-
-    room.phaseDuration =
-        duration;
+    room.phase = phase;
+    room.phaseDuration = duration;
 
     room.phaseEndTime =
-        Date.now() +
-        duration * 1000;
+        Date.now() + duration * 1000;
 
+    console.log(
+        "FAZ:",
+        roomCode,
+        phase
+    );
 
     io.to(roomCode).emit(
         "phaseChanged",
@@ -282,25 +276,23 @@ function setPhase(
     );
 }
 
-
-// ======================================
+// ============================================
 // GECE
-// ======================================
+// ============================================
 
 function startNight(roomCode) {
+    const room = rooms[roomCode];
 
-    const room =
-        rooms[roomCode];
-
-    if (!room || !room.gameStarted) {
+    if (
+        !room ||
+        !room.gameStarted
+    ) {
         return;
     }
-
 
     room.vampireTarget = null;
     room.doctorTarget = null;
     room.detectiveTarget = null;
-
 
     setPhase(
         roomCode,
@@ -308,96 +300,62 @@ function startNight(roomCode) {
         30
     );
 
-
-    // Rollere göre gece yeteneklerini göster
-    room.players.forEach(
-        player => {
-
-            if (!player.alive) {
-                return;
-            }
-
-
-            io.to(player.id).emit(
-                "nightStarted",
-                {
-                    role: player.role
-                }
-            );
-
+    room.players.forEach(player => {
+        if (!player.alive) {
+            return;
         }
-    );
 
-
-    room.phaseTimer =
-        setTimeout(
-            () => {
-
-                finishNight(
-                    roomCode
-                );
-
-            },
-            30000
+        io.to(player.id).emit(
+            "nightStarted",
+            {
+                role: player.role
+            }
         );
+    });
+
+    room.phaseTimer = setTimeout(() => {
+        finishNight(roomCode);
+    }, 30000);
 }
 
-
-// ======================================
+// ============================================
 // GECEYİ BİTİR
-// ======================================
+// ============================================
 
 function finishNight(roomCode) {
+    const room = rooms[roomCode];
 
-    const room =
-        rooms[roomCode];
-
-    if (!room || !room.gameStarted) {
+    if (
+        !room ||
+        !room.gameStarted
+    ) {
         return;
     }
 
-
     let killedPlayer = null;
 
-
-    // Vampir hedef seçmişse
     if (room.vampireTarget) {
-
-        const target =
-            room.players.find(
-                p =>
-                    p.id ===
-                    room.vampireTarget
-            );
-
+        const target = room.players.find(
+            p =>
+                p.id ===
+                room.vampireTarget
+        );
 
         if (
             target &&
             target.alive
         ) {
-
-            // Doktor kurtarmadıysa öldür
             if (
                 room.doctorTarget !==
                 target.id
             ) {
-
-                target.alive =
-                    false;
-
-                killedPlayer =
-                    target;
-
+                target.alive = false;
+                killedPlayer = target;
             }
-
         }
-
     }
 
-
-    // Gece sonucu
     if (killedPlayer) {
-
         io.to(roomCode).emit(
             "nightResult",
             {
@@ -405,61 +363,39 @@ function finishNight(roomCode) {
                     killedPlayer.username
             }
         );
-
-    }
-    else {
-
+    } else {
         io.to(roomCode).emit(
             "nightResult",
             {
                 killed: null
             }
         );
-
     }
-
 
     sendPlayers(roomCode);
 
-
-    // Kazanan var mı?
-    if (
-        checkWin(roomCode)
-    ) {
-
+    if (checkWin(roomCode)) {
         return;
-
     }
 
-
-    // 4 saniye sonra gündüz
-    room.phaseTimer =
-        setTimeout(
-            () => {
-
-                startDiscussion(
-                    roomCode
-                );
-
-            },
-            4000
-        );
+    room.phaseTimer = setTimeout(() => {
+        startDiscussion(roomCode);
+    }, 4000);
 }
 
-
-// ======================================
-// GÜNDÜZ / TARTIŞMA
-// ======================================
+// ============================================
+// TARTIŞMA
+// ============================================
 
 function startDiscussion(roomCode) {
+    const room = rooms[roomCode];
 
-    const room =
-        rooms[roomCode];
-
-    if (!room || !room.gameStarted) {
+    if (
+        !room ||
+        !room.gameStarted
+    ) {
         return;
     }
-
 
     setPhase(
         roomCode,
@@ -467,37 +403,26 @@ function startDiscussion(roomCode) {
         30
     );
 
-
-    room.phaseTimer =
-        setTimeout(
-            () => {
-
-                startVoting(
-                    roomCode
-                );
-
-            },
-            30000
-        );
+    room.phaseTimer = setTimeout(() => {
+        startVoting(roomCode);
+    }, 30000);
 }
 
-
-// ======================================
+// ============================================
 // OYLAMA
-// ======================================
+// ============================================
 
 function startVoting(roomCode) {
+    const room = rooms[roomCode];
 
-    const room =
-        rooms[roomCode];
-
-    if (!room || !room.gameStarted) {
+    if (
+        !room ||
+        !room.gameStarted
+    ) {
         return;
     }
 
-
     room.votes = {};
-
 
     setPhase(
         roomCode,
@@ -505,102 +430,65 @@ function startVoting(roomCode) {
         20
     );
 
-
     io.to(roomCode).emit(
         "votingStarted"
     );
 
-
-    room.phaseTimer =
-        setTimeout(
-            () => {
-
-                finishVoting(
-                    roomCode
-                );
-
-            },
-            20000
-        );
+    room.phaseTimer = setTimeout(() => {
+        finishVoting(roomCode);
+    }, 20000);
 }
 
-
-// ======================================
+// ============================================
 // OYLARI SAY
-// ======================================
+// ============================================
 
 function finishVoting(roomCode) {
+    const room = rooms[roomCode];
 
-    const room =
-        rooms[roomCode];
-
-    if (!room || !room.gameStarted) {
+    if (
+        !room ||
+        !room.gameStarted
+    ) {
         return;
     }
 
-
     const voteCounts = {};
 
-
-    Object.values(
-        room.votes
-    ).forEach(
+    Object.values(room.votes).forEach(
         targetId => {
-
-            if (
-                !voteCounts[targetId]
-            ) {
-
-                voteCounts[targetId] =
-                    0;
-
+            if (!voteCounts[targetId]) {
+                voteCounts[targetId] = 0;
             }
 
             voteCounts[targetId]++;
-
         }
     );
-
 
     let highestVotes = 0;
     let candidates = [];
 
-
-    Object.entries(
-        voteCounts
-    ).forEach(
+    Object.entries(voteCounts).forEach(
         ([id, votes]) => {
 
             if (
                 votes >
                 highestVotes
             ) {
+                highestVotes = votes;
+                candidates = [id];
 
-                highestVotes =
-                    votes;
-
-                candidates =
-                    [id];
-
-            }
-
-            else if (
+            } else if (
                 votes ===
                 highestVotes
             ) {
-
                 candidates.push(id);
-
             }
-
         }
     );
 
-
-    // Kimse oy vermediyse
-    if (
-        candidates.length === 0
-    ) {
+    // Kimse oy vermedi
+    if (candidates.length === 0) {
 
         io.to(roomCode).emit(
             "executionResult",
@@ -611,27 +499,15 @@ function finishVoting(roomCode) {
             }
         );
 
-
-        room.phaseTimer =
-            setTimeout(
-                () => {
-
-                    startNight(
-                        roomCode
-                    );
-
-                },
-                4000
-            );
+        room.phaseTimer = setTimeout(() => {
+            startNight(roomCode);
+        }, 4000);
 
         return;
     }
 
-
-    // Eşitlik
-    if (
-        candidates.length > 1
-    ) {
+    // Eşit oy
+    if (candidates.length > 1) {
 
         io.to(roomCode).emit(
             "executionResult",
@@ -642,24 +518,13 @@ function finishVoting(roomCode) {
             }
         );
 
-
-        room.phaseTimer =
-            setTimeout(
-                () => {
-
-                    startNight(
-                        roomCode
-                    );
-
-                },
-                4000
-            );
+        room.phaseTimer = setTimeout(() => {
+            startNight(roomCode);
+        }, 4000);
 
         return;
     }
 
-
-    // Asılacak oyuncu
     const executedPlayer =
         room.players.find(
             player =>
@@ -667,12 +532,9 @@ function finishVoting(roomCode) {
                 candidates[0]
         );
 
-
     if (executedPlayer) {
 
-        executedPlayer.alive =
-            false;
-
+        executedPlayer.alive = false;
 
         io.to(roomCode).emit(
             "executionResult",
@@ -687,219 +549,232 @@ function finishVoting(roomCode) {
                     highestVotes
             }
         );
-
     }
-
 
     sendPlayers(roomCode);
 
-
-    // Kazanma kontrolü
-    if (
-        checkWin(roomCode)
-    ) {
-
+    if (checkWin(roomCode)) {
         return;
-
     }
 
-
-    // 5 saniye sonra gece
-    room.phaseTimer =
-        setTimeout(
-            () => {
-
-                startNight(
-                    roomCode
-                );
-
-            },
-            5000
-        );
+    room.phaseTimer = setTimeout(() => {
+        startNight(roomCode);
+    }, 5000);
 }
 
+// ============================================
+// SOCKET.IO
+// ============================================
 
-// ======================================
-// SOCKET
-// ======================================
+io.on("connection", socket => {
 
-io.on(
-    "connection",
-    socket => {
+    console.log(
+        "================================="
+    );
 
-        console.log(
-            "Bağlandı:",
-            socket.id
-        );
+    console.log(
+        "YENİ BAĞLANTI:",
+        socket.id
+    );
 
+    console.log(
+        "================================="
+    );
 
-        // ==================================
-        // GAME.HTML AÇILDIĞINDA
-        // ==================================
+    // ========================================
+    // OYUN DURUMUNU İSTE
+    // ========================================
 
-        socket.on(
-            "requestGameState",
-            () => {
+    socket.on(
+        "requestGameState",
+        data => {
 
-                sendGameState(
-                    socket
+            console.log(
+                "GAME STATE İSTEĞİ:",
+                data
+            );
+
+            if (
+                !data ||
+                !data.roomCode ||
+                !data.token
+            ) {
+                socket.emit(
+                    "roomError",
+                    "Oyun bilgileri eksik."
                 );
 
+                return;
             }
-        );
 
+            const roomCode =
+                String(data.roomCode)
+                    .trim()
+                    .toUpperCase();
 
-        // ==================================
-        // ODA OLUŞTUR
-        // ==================================
+            const token =
+                String(data.token);
 
-        socket.on(
-            "createRoom",
-            username => {
+            const room =
+                rooms[roomCode];
 
-                let roomCode;
+            if (!room) {
 
-
-                do {
-
-                    roomCode =
-                        Math.random()
-                            .toString(36)
-                            .substring(
-                                2,
-                                8
-                            )
-                            .toUpperCase();
-
-                }
-                while (
-                    rooms[roomCode]
-                );
-
-
-                rooms[roomCode] = {
-
-                    host:
-                        socket.id,
-
-                    players: [],
-
-                    gameStarted:
-                        false,
-
-                    phase:
-                        "lobby",
-
-                    phaseDuration:
-                        0,
-
-                    phaseEndTime:
-                        0,
-
-                    phaseTimer:
-                        null,
-
-                    votes: {},
-
-                    vampireTarget:
-                        null,
-
-                    doctorTarget:
-                        null,
-
-                    detectiveTarget:
-                        null
-                };
-
-
-                rooms[
-                    roomCode
-                ].players.push({
-
-                    id:
-                        socket.id,
-
-                    username:
-                        username,
-
-                    role:
-                        null,
-
-                    alive:
-                        true
-                });
-
-
-                socket.join(
+                console.log(
+                    "ODA BULUNAMADI:",
                     roomCode
                 );
-
-                socket.roomCode =
-                    roomCode;
-
-                socket.username =
-                    username;
-
 
                 socket.emit(
-                    "roomCreated",
-                    roomCode
+                    "roomError",
+                    "Oda bulunamadı."
                 );
 
-
-                sendPlayers(
-                    roomCode
-                );
-
+                return;
             }
-        );
 
+            const player =
+                room.players.find(
+                    p =>
+                        p.token ===
+                        token
+                );
 
-        // ==================================
-        // ODAYA KATIL
-        // ==================================
+            if (!player) {
 
-        socket.on(
-            "joinRoom",
-            ({ username, roomCode }) => {
+                console.log(
+                    "TOKEN BULUNAMADI"
+                );
+
+                socket.emit(
+                    "roomError",
+                    "Oyuncu bulunamadı."
+                );
+
+                return;
+            }
+
+            player.id = socket.id;
+
+            socket.roomCode =
+                roomCode;
+
+            socket.username =
+                player.username;
+
+            socket.playerToken =
+                token;
+
+            socket.join(roomCode);
+
+            if (
+                room.host ===
+                player.id
+            ) {
+                room.host =
+                    socket.id;
+            }
+
+            console.log(
+                "OYUNCU YENİ SOCKET'E BAĞLANDI:",
+                player.username,
+                socket.id
+            );
+
+            sendGameState(socket);
+            sendPlayers(roomCode);
+        }
+    );
+
+    // ========================================
+    // ODA OLUŞTUR
+    // ========================================
+
+    socket.on(
+        "createRoom",
+        username => {
+
+            console.log(
+                "CREATE ROOM:",
+                username
+            );
+
+            username =
+                String(username)
+                    .trim();
+
+            if (!username) {
+
+                socket.emit(
+                    "roomError",
+                    "Kullanıcı adı gerekli."
+                );
+
+                return;
+            }
+
+            let roomCode;
+
+            do {
 
                 roomCode =
-                    roomCode
+                    Math.random()
+                        .toString(36)
+                        .substring(2, 8)
                         .toUpperCase();
 
+            } while (
+                rooms[roomCode]
+            );
 
-                const room =
-                    rooms[roomCode];
+            const token =
+                createPlayerToken();
 
+            rooms[roomCode] = {
 
-                if (!room) {
+                host:
+                    socket.id,
 
-                    socket.emit(
-                        "roomError",
-                        "Bu oda bulunamadı."
-                    );
+                players:
+                    [],
 
-                    return;
-                }
+                gameStarted:
+                    false,
 
+                phase:
+                    "lobby",
 
-                if (
-                    room.gameStarted
-                ) {
+                phaseDuration:
+                    0,
 
-                    socket.emit(
-                        "roomError",
-                        "Oyun zaten başladı."
-                    );
+                phaseEndTime:
+                    0,
 
-                    return;
-                }
+                phaseTimer:
+                    null,
 
+                votes:
+                    {},
 
-                room.players.push({
+                vampireTarget:
+                    null,
+
+                doctorTarget:
+                    null,
+
+                detectiveTarget:
+                    null
+            };
+
+            rooms[roomCode]
+                .players
+                .push({
 
                     id:
                         socket.id,
+
+                    token:
+                        token,
 
                     username:
                         username,
@@ -909,542 +784,743 @@ io.on(
 
                     alive:
                         true
-
                 });
 
+            socket.roomCode =
+                roomCode;
 
-                socket.join(
-                    roomCode
-                );
+            socket.username =
+                username;
 
-                socket.roomCode =
-                    roomCode;
+            socket.playerToken =
+                token;
 
-                socket.username =
-                    username;
+            socket.join(roomCode);
 
+            console.log(
+                "ODA OLUŞTURULDU:",
+                roomCode
+            );
 
-                socket.emit(
-                    "joinedRoom",
-                    roomCode
-                );
+            console.log(
+                "OYUNCULAR:",
+                rooms[roomCode].players
+            );
 
+            socket.emit(
+                "roomCreated",
+                {
+                    roomCode:
+                        roomCode,
 
-                sendPlayers(
-                    roomCode
-                );
-
-            }
-        );
-
-
-        // ==================================
-        // OYUNU BAŞLAT
-        // ==================================
-
-        socket.on(
-            "startGame",
-            () => {
-
-                const roomCode =
-                    socket.roomCode;
-
-                const room =
-                    rooms[roomCode];
-
-
-                if (!room) {
-                    return;
+                    token:
+                        token
                 }
-
-
-                if (
-                    room.host !==
-                    socket.id
-                ) {
-
-                    return;
-
-                }
-
-
-                if (
-                    room.players.length <
-                    3
-                ) {
-
-                    socket.emit(
-                        "gameError",
-                        "En az 3 oyuncu gerekli."
-                    );
-
-                    return;
-                }
-
-
-                if (
-                    room.gameStarted
-                ) {
-
-                    return;
-
-                }
-
-
-                const roles =
-                    createRoles(
-                        room.players.length
-                    );
-
-
-                room.players.forEach(
-                    (player, index) => {
-
-                        player.role =
-                            roles[index];
-
-                        player.alive =
-                            true;
-
-                    }
-                );
-
-
-                room.gameStarted =
-                    true;
-
-
-                // Rolleri oyunculara gönder
-                room.players.forEach(
-                    player => {
-
-                        io.to(
-                            player.id
-                        ).emit(
-                            "gameStarted",
-                            {
-                                username:
-                                    player.username,
-
-                                role:
-                                    player.role,
-
-                                roomCode:
-                                    roomCode
-                            }
-                        );
-
-                    }
-                );
-
-
-                sendPlayers(
-                    roomCode
-                );
-
-
-                // 1 saniye sonra gece
-                room.phaseTimer =
-                    setTimeout(
-                        () => {
-
-                            startNight(
-                                roomCode
-                            );
-
-                        },
-                        1000
-                    );
-
-            }
-        );
-
-
-        // ==================================
-        // VAMPİR ÖLDÜRME
-        // ==================================
-
-        socket.on(
-            "vampireKill",
-            targetId => {
-
-                const room =
-                    rooms[
-                        socket.roomCode
-                    ];
-
-
-                if (
-                    !room ||
-                    room.phase !==
-                    "night"
-                ) {
-
-                    return;
-
-                }
-
-
-                const player =
-                    room.players.find(
-                        p =>
-                            p.id ===
-                            socket.id
-                    );
-
-
-                if (
-                    !player ||
-                    !player.alive ||
-                    player.role !==
-                    "Vampir"
-                ) {
-
-                    return;
-
-                }
-
-
-                const target =
-                    room.players.find(
-                        p =>
-                            p.id ===
-                            targetId
-                    );
-
-
-                if (
-                    !target ||
-                    !target.alive ||
-                    target.id ===
-                    socket.id
-                ) {
-
-                    return;
-
-                }
-
-
-                room.vampireTarget =
-                    targetId;
-
-
-                socket.emit(
-                    "actionConfirmed",
-                    "🩸 Hedef seçildi."
-                );
-
-            }
-        );
-
-
-        // ==================================
-        // DOKTOR
-        // ==================================
-
-        socket.on(
-            "doctorSave",
-            targetId => {
-
-                const room =
-                    rooms[
-                        socket.roomCode
-                    ];
-
-
-                if (
-                    !room ||
-                    room.phase !==
-                    "night"
-                ) {
-
-                    return;
-
-                }
-
-
-                const player =
-                    room.players.find(
-                        p =>
-                            p.id ===
-                            socket.id
-                    );
-
-
-                if (
-                    !player ||
-                    !player.alive ||
-                    player.role !==
-                    "Doktor"
-                ) {
-
-                    return;
-
-                }
-
-
-                const target =
-                    room.players.find(
-                        p =>
-                            p.id ===
-                            targetId
-                    );
-
-
-                if (
-                    !target ||
-                    !target.alive
-                ) {
-
-                    return;
-
-                }
-
-
-                room.doctorTarget =
-                    targetId;
-
-
-                socket.emit(
-                    "actionConfirmed",
-                    "🩺 Kurtarma hedefi seçildi."
-                );
-
-            }
-        );
-
-
-        // ==================================
-        // DEDEKTİF
-        // ==================================
-
-        socket.on(
-            "detectiveCheck",
-            targetId => {
-
-                const room =
-                    rooms[
-                        socket.roomCode
-                    ];
-
-
-                if (
-                    !room ||
-                    room.phase !==
-                    "night"
-                ) {
-
-                    return;
-
-                }
-
-
-                const player =
-                    room.players.find(
-                        p =>
-                            p.id ===
-                            socket.id
-                    );
-
-
-                if (
-                    !player ||
-                    !player.alive ||
-                    player.role !==
-                    "Dedektif"
-                ) {
-
-                    return;
-
-                }
-
-
-                const target =
-                    room.players.find(
-                        p =>
-                            p.id ===
-                            targetId
-                    );
-
-
-                if (!target) {
-                    return;
-                }
-
-
-                socket.emit(
-                    "detectiveResult",
-                    {
-                        username:
-                            target.username,
-
-                        isVampire:
-                            target.role ===
-                            "Vampir"
-                    }
-                );
-
-            }
-        );
-
-
-        // ==================================
-        // OY VER
-        // ==================================
-
-        socket.on(
-            "vote",
-            targetId => {
-
-                const room =
-                    rooms[
-                        socket.roomCode
-                    ];
-
-
-                if (
-                    !room ||
-                    room.phase !==
-                    "voting"
-                ) {
-
-                    return;
-
-                }
-
-
-                const voter =
-                    room.players.find(
-                        p =>
-                            p.id ===
-                            socket.id
-                    );
-
-
-                if (
-                    !voter ||
-                    !voter.alive
-                ) {
-
-                    return;
-
-                }
-
-
-                const target =
-                    room.players.find(
-                        p =>
-                            p.id ===
-                            targetId
-                    );
-
-
-                if (
-                    !target ||
-                    !target.alive ||
-                    target.id ===
-                    socket.id
-                ) {
-
-                    return;
-
-                }
-
-
-                room.votes[
-                    socket.id
-                ] =
-                    targetId;
-
-
-                socket.emit(
-                    "actionConfirmed",
-                    "🗳️ Oyun kaydedildi."
-                );
-
-            }
-        );
-
-
-        // ==================================
-        // CHAT
-        // ==================================
-
-        socket.on(
-            "chatMessage",
-            message => {
-
-                const room =
-                    rooms[
-                        socket.roomCode
-                    ];
-
-
-                if (!room) {
-                    return;
-                }
-
-
-                const player =
-                    room.players.find(
-                        p =>
-                            p.id ===
-                            socket.id
-                    );
-
-
-                if (
-                    !player ||
-                    !player.alive
-                ) {
-
-                    return;
-
-                }
-
-
-                io.to(
-                    socket.roomCode
-                ).emit(
-                    "chatMessage",
-                    {
-                        username:
-                            player.username,
-
+            );
+
+            sendPlayers(roomCode);
+        }
+    );
+
+    // ========================================
+    // ODAYA KATIL
+    // ========================================
+
+    socket.on(
+        "joinRoom",
+        (data, callback) => {
+
+            console.log(
+                "================================="
+            );
+
+            console.log(
+                "JOIN İSTEĞİ GELDİ"
+            );
+
+            console.log(
+                "DATA:",
+                data
+            );
+
+            console.log(
+                "SOCKET:",
+                socket.id
+            );
+
+            console.log(
+                "================================="
+            );
+
+            if (!data) {
+
+                if (callback) {
+                    callback({
+                        success: false,
                         message:
-                            message
-                    }
-                );
-
-            }
-        );
-
-
-        // ==================================
-        // DISCONNECT
-        // ==================================
-
-        socket.on(
-            "disconnect",
-            () => {
-
-                const roomCode =
-                    socket.roomCode;
-
-
-                if (
-                    !roomCode ||
-                    !rooms[roomCode]
-                ) {
-
-                    return;
-
+                            "Veri alınamadı."
+                    });
                 }
 
+                return;
+            }
 
-                const room =
-                    rooms[roomCode];
+            const username =
+                String(
+                    data.username || ""
+                ).trim();
 
+            const roomCode =
+                String(
+                    data.roomCode || ""
+                )
+                    .trim()
+                    .toUpperCase();
+
+            console.log(
+                "USERNAME:",
+                username
+            );
+
+            console.log(
+                "ROOM CODE:",
+                roomCode
+            );
+
+            if (!username) {
+
+                if (callback) {
+                    callback({
+                        success: false,
+                        message:
+                            "Kullanıcı adı gerekli."
+                    });
+                }
+
+                return;
+            }
+
+            if (!roomCode) {
+
+                if (callback) {
+                    callback({
+                        success: false,
+                        message:
+                            "Oda kodu gerekli."
+                    });
+                }
+
+                return;
+            }
+
+            const room =
+                rooms[roomCode];
+
+            if (!room) {
+
+                console.log(
+                    "❌ ODA BULUNAMADI:",
+                    roomCode
+                );
+
+                if (callback) {
+                    callback({
+                        success: false,
+                        message:
+                            "Bu oda bulunamadı."
+                    });
+                }
+
+                return;
+            }
+
+            console.log(
+                "✅ ODA BULUNDU"
+            );
+
+            console.log(
+                "MEVCUT OYUNCULAR:",
+                room.players.map(
+                    p => p.username
+                )
+            );
+
+            if (room.gameStarted) {
+
+                if (callback) {
+                    callback({
+                        success: false,
+                        message:
+                            "Oyun zaten başladı."
+                    });
+                }
+
+                return;
+            }
+
+            const nameExists =
+                room.players.some(
+                    player =>
+                        player.username
+                            .toLowerCase() ===
+                        username.toLowerCase()
+                );
+
+            if (nameExists) {
+
+                console.log(
+                    "❌ AYNI İSİM:",
+                    username
+                );
+
+                if (callback) {
+                    callback({
+                        success: false,
+                        message:
+                            "Bu kullanıcı adı odada zaten kullanılıyor."
+                    });
+                }
+
+                return;
+            }
+
+            const token =
+                createPlayerToken();
+
+            const newPlayer = {
+
+                id:
+                    socket.id,
+
+                token:
+                    token,
+
+                username:
+                    username,
+
+                role:
+                    null,
+
+                alive:
+                    true
+            };
+
+            room.players.push(
+                newPlayer
+            );
+
+            socket.roomCode =
+                roomCode;
+
+            socket.username =
+                username;
+
+            socket.playerToken =
+                token;
+
+            socket.join(roomCode);
+
+            console.log(
+                "================================="
+            );
+
+            console.log(
+                "✅ OYUNCU BAŞARIYLA EKLENDİ"
+            );
+
+            console.log(
+                "USERNAME:",
+                username
+            );
+
+            console.log(
+                "ROOM:",
+                roomCode
+            );
+
+            console.log(
+                "OYUNCU SAYISI:",
+                room.players.length
+            );
+
+            console.log(
+                "OYUNCULAR:",
+                room.players.map(
+                    p => p.username
+                )
+            );
+
+            console.log(
+                "================================="
+            );
+
+            // Katılan oyuncuya cevap
+            if (callback) {
+
+                callback({
+                    success:
+                        true,
+
+                    roomCode:
+                        roomCode,
+
+                    token:
+                        token
+                });
+            }
+
+            // Odaya yeni listeyi gönder
+            sendPlayers(roomCode);
+        }
+    );
+
+    // ========================================
+    // OYUNU BAŞLAT
+    // ========================================
+
+    socket.on(
+        "startGame",
+        () => {
+
+            const roomCode =
+                socket.roomCode;
+
+            const room =
+                rooms[roomCode];
+
+            if (!room) {
+                return;
+            }
+
+            if (
+                room.host !==
+                socket.id
+            ) {
+
+                socket.emit(
+                    "gameError",
+                    "Sadece oda sahibi oyunu başlatabilir."
+                );
+
+                return;
+            }
+
+            if (
+                room.players.length < 3
+            ) {
+
+                socket.emit(
+                    "gameError",
+                    "En az 3 oyuncu gerekli."
+                );
+
+                return;
+            }
+
+            if (room.gameStarted) {
+                return;
+            }
+
+            const roles =
+                createRoles(
+                    room.players.length
+                );
+
+            room.players.forEach(
+                (player, index) => {
+
+                    player.role =
+                        roles[index];
+
+                    player.alive =
+                        true;
+                }
+            );
+
+            room.gameStarted =
+                true;
+
+            console.log(
+                "OYUN BAŞLADI:",
+                roomCode
+            );
+
+            room.players.forEach(
+                player => {
+
+                    io.to(
+                        player.id
+                    ).emit(
+                        "gameStarted",
+                        {
+                            username:
+                                player.username,
+
+                            role:
+                                player.role,
+
+                            roomCode:
+                                roomCode
+                        }
+                    );
+                }
+            );
+
+            sendPlayers(roomCode);
+
+            room.phaseTimer =
+                setTimeout(() => {
+                    startNight(roomCode);
+                }, 1000);
+        }
+    );
+
+    // ========================================
+    // VAMPİR
+    // ========================================
+
+    socket.on(
+        "vampireKill",
+        targetId => {
+
+            const room =
+                rooms[
+                    socket.roomCode
+                ];
+
+            if (
+                !room ||
+                room.phase !==
+                "night"
+            ) {
+                return;
+            }
+
+            const player =
+                room.players.find(
+                    p =>
+                        p.id ===
+                        socket.id
+                );
+
+            if (
+                !player ||
+                !player.alive ||
+                player.role !==
+                "Vampir"
+            ) {
+                return;
+            }
+
+            const target =
+                room.players.find(
+                    p =>
+                        p.id ===
+                        targetId
+                );
+
+            if (
+                !target ||
+                !target.alive ||
+                target.id ===
+                socket.id
+            ) {
+                return;
+            }
+
+            room.vampireTarget =
+                target.id;
+
+            socket.emit(
+                "actionConfirmed",
+                "Hedef seçildi."
+            );
+        }
+    );
+
+    // ========================================
+    // DOKTOR
+    // ========================================
+
+    socket.on(
+        "doctorSave",
+        targetId => {
+
+            const room =
+                rooms[
+                    socket.roomCode
+                ];
+
+            if (
+                !room ||
+                room.phase !==
+                "night"
+            ) {
+                return;
+            }
+
+            const player =
+                room.players.find(
+                    p =>
+                        p.id ===
+                        socket.id
+                );
+
+            if (
+                !player ||
+                !player.alive ||
+                player.role !==
+                "Doktor"
+            ) {
+                return;
+            }
+
+            const target =
+                room.players.find(
+                    p =>
+                        p.id ===
+                        targetId
+                );
+
+            if (
+                !target ||
+                !target.alive
+            ) {
+                return;
+            }
+
+            room.doctorTarget =
+                target.id;
+
+            socket.emit(
+                "actionConfirmed",
+                "Oyuncu kurtarma hedefi seçildi."
+            );
+        }
+    );
+
+    // ========================================
+    // DEDEKTİF
+    // ========================================
+
+    socket.on(
+        "detectiveCheck",
+        targetId => {
+
+            const room =
+                rooms[
+                    socket.roomCode
+                ];
+
+            if (
+                !room ||
+                room.phase !==
+                "night"
+            ) {
+                return;
+            }
+
+            const player =
+                room.players.find(
+                    p =>
+                        p.id ===
+                        socket.id
+                );
+
+            if (
+                !player ||
+                !player.alive ||
+                player.role !==
+                "Dedektif"
+            ) {
+                return;
+            }
+
+            const target =
+                room.players.find(
+                    p =>
+                        p.id ===
+                        targetId
+                );
+
+            if (
+                !target ||
+                !target.alive ||
+                target.id ===
+                socket.id
+            ) {
+                return;
+            }
+
+            socket.emit(
+                "detectiveResult",
+                {
+                    username:
+                        target.username,
+
+                    isVampire:
+                        target.role ===
+                        "Vampir"
+                }
+            );
+        }
+    );
+
+    // ========================================
+    // OY
+    // ========================================
+
+    socket.on(
+        "vote",
+        targetId => {
+
+            const room =
+                rooms[
+                    socket.roomCode
+                ];
+
+            if (
+                !room ||
+                room.phase !==
+                "voting"
+            ) {
+                return;
+            }
+
+            const voter =
+                room.players.find(
+                    p =>
+                        p.id ===
+                        socket.id
+                );
+
+            if (
+                !voter ||
+                !voter.alive
+            ) {
+                return;
+            }
+
+            const target =
+                room.players.find(
+                    p =>
+                        p.id ===
+                        targetId
+                );
+
+            if (
+                !target ||
+                !target.alive ||
+                target.id ===
+                socket.id
+            ) {
+                return;
+            }
+
+            room.votes[
+                socket.id
+            ] = target.id;
+
+            socket.emit(
+                "actionConfirmed",
+                "Oyun kaydedildi."
+            );
+        }
+    );
+
+    // ========================================
+    // CHAT
+    // ========================================
+
+    socket.on(
+        "chatMessage",
+        message => {
+
+            const room =
+                rooms[
+                    socket.roomCode
+                ];
+
+            if (!room) {
+                return;
+            }
+
+            const player =
+                room.players.find(
+                    p =>
+                        p.id ===
+                        socket.id
+                );
+
+            if (
+                !player ||
+                !player.alive
+            ) {
+                return;
+            }
+
+            message =
+                String(message)
+                    .trim();
+
+            if (!message) {
+                return;
+            }
+
+            if (
+                message.length > 300
+            ) {
+                message =
+                    message.substring(
+                        0,
+                        300
+                    );
+            }
+
+            io.to(
+                socket.roomCode
+            ).emit(
+                "chatMessage",
+                {
+                    username:
+                        player.username,
+
+                    message:
+                        message
+                }
+            );
+        }
+    );
+
+    // ========================================
+    // DISCONNECT
+    // ========================================
+
+    socket.on(
+        "disconnect",
+        () => {
+
+            console.log(
+                "BAĞLANTI KOPTU:",
+                socket.id,
+                socket.username
+            );
+
+            const roomCode =
+                socket.roomCode;
+
+            if (
+                !roomCode ||
+                !rooms[roomCode]
+            ) {
+                return;
+            }
+
+            const room =
+                rooms[roomCode];
+
+            // Oyun başlamadıysa oyuncuyu çıkar
+            if (!room.gameStarted) {
 
                 room.players =
                     room.players.filter(
@@ -1453,8 +1529,7 @@ io.on(
                             socket.id
                     );
 
-
-                // Host ayrılırsa yeni host
+                // Host çıktıysa yeni host
                 if (
                     room.host ===
                     socket.id
@@ -1468,16 +1543,17 @@ io.on(
                         room.host =
                             room.players[0].id;
 
+                        io.to(
+                            room.host
+                        ).emit(
+                            "newHost"
+                        );
                     }
-
                 }
 
+                sendPlayers(roomCode);
 
-                sendPlayers(
-                    roomCode
-                );
-
-
+                // Oda boşsa sil
                 if (
                     room.players.length ===
                     0
@@ -1486,34 +1562,39 @@ io.on(
                     if (
                         room.phaseTimer
                     ) {
-
                         clearTimeout(
                             room.phaseTimer
                         );
-
                     }
-
 
                     delete rooms[
                         roomCode
                     ];
 
+                    console.log(
+                        "ODA SİLİNDİ:",
+                        roomCode
+                    );
                 }
-
             }
-        );
 
-    }
-);
+            // Oyun başladıysa oyuncu
+            // odadan silinmez.
+        }
+    );
+});
 
 
-server.listen(
-    3000,
-    () => {
+// ============================================
+// SERVER (RENDER UYUMLU)
+// ============================================
 
-        console.log(
-            "Server çalışıyor: http://localhost:3000"
-        );
+const PORT = process.env.PORT || 3000;
 
-    }
-);
+server.listen(PORT, () => {
+    console.log("=================================");
+    console.log("SERVER ÇALIŞIYOR");
+    console.log("Port:", PORT);
+    console.log("=================================");
+});
+
