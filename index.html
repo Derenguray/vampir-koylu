@@ -2,7 +2,6 @@
 <html lang="tr">
 
 <head>
-
     <meta charset="UTF-8">
 
     <meta
@@ -11,17 +10,11 @@
     >
 
     <title>Vampir Köylü</title>
-
 </head>
 
 <body>
 
     <h1>🧛 Vampir Köylü</h1>
-
-
-    <!-- ========================= -->
-    <!-- OYUNA KATIL -->
-    <!-- ========================= -->
 
     <h2>Oyuna Katıl</h2>
 
@@ -34,18 +27,12 @@
     <br>
     <br>
 
-
-    <!-- ODA OLUŞTUR -->
-
     <button id="createRoom">
         Oda Oluştur
     </button>
 
     <br>
     <br>
-
-
-    <!-- ODAYA KATIL -->
 
     <input
         id="roomCode"
@@ -57,15 +44,9 @@
         Odaya Katıl
     </button>
 
-
     <p id="message"></p>
 
     <hr>
-
-
-    <!-- ========================= -->
-    <!-- LOBİ -->
-    <!-- ========================= -->
 
     <h2>🏠 Lobi</h2>
 
@@ -73,37 +54,27 @@
         Henüz bir odaya girmedin.
     </h3>
 
-    <p>
+    <h3>
         Oyuncu sayısı:
         <span id="playerCount">0</span>
-    </p>
-
-
-    <!-- OYUNCULAR -->
+    </h3>
 
     <h3>Oyuncular</h3>
 
     <ul id="playerList"></ul>
 
-
-    <!-- OYUNU BAŞLAT -->
+    <br>
 
     <button
         id="startGameButton"
-        style="display:none;"
+        style="display: none;"
     >
         🎮 Oyunu Başlat
     </button>
 
-
     <hr>
 
-
-    <!-- ========================= -->
-    <!-- CHAT -->
-    <!-- ========================= -->
-
-    <h3>Chat</h3>
+    <h3>💬 Chat</h3>
 
     <div id="messages"></div>
 
@@ -119,62 +90,130 @@
         Gönder
     </button>
 
-
     <script src="/socket.io/socket.io.js"></script>
 
     <script>
 
+        // ========================================
+        // SOCKET
+        // ========================================
+
         const socket = io();
 
+        console.log(
+            "INDEX SOCKET OLUŞTURULDU"
+        );
 
-        // =========================
+        // ========================================
         // ELEMENTLER
-        // =========================
+        // ========================================
 
         const usernameInput =
-            document.getElementById("username");
+            document.getElementById(
+                "username"
+            );
 
         const roomCodeInput =
-            document.getElementById("roomCode");
+            document.getElementById(
+                "roomCode"
+            );
 
         const createRoomButton =
-            document.getElementById("createRoom");
+            document.getElementById(
+                "createRoom"
+            );
 
         const joinRoomButton =
-            document.getElementById("joinRoom");
+            document.getElementById(
+                "joinRoom"
+            );
 
         const message =
-            document.getElementById("message");
+            document.getElementById(
+                "message"
+            );
 
         const currentRoom =
-            document.getElementById("currentRoom");
+            document.getElementById(
+                "currentRoom"
+            );
 
         const playerList =
-            document.getElementById("playerList");
+            document.getElementById(
+                "playerList"
+            );
 
         const playerCount =
-            document.getElementById("playerCount");
+            document.getElementById(
+                "playerCount"
+            );
 
         const startGameButton =
-            document.getElementById("startGameButton");
+            document.getElementById(
+                "startGameButton"
+            );
 
         const messageInput =
-            document.getElementById("messageInput");
+            document.getElementById(
+                "messageInput"
+            );
 
         const sendButton =
-            document.getElementById("sendButton");
+            document.getElementById(
+                "sendButton"
+            );
 
         const messages =
-            document.getElementById("messages");
+            document.getElementById(
+                "messages"
+            );
 
+        // ========================================
+        // SOCKET BAĞLANDI
+        // ========================================
 
-        // =========================
+        socket.on(
+            "connect",
+            () => {
+
+                console.log(
+                    "INDEX SOCKET BAĞLANDI:",
+                    socket.id
+                );
+
+            }
+        );
+
+        // ========================================
+        // SOCKET HATASI
+        // ========================================
+
+        socket.on(
+            "connect_error",
+            error => {
+
+                console.error(
+                    "SOCKET BAĞLANTI HATASI:",
+                    error
+                );
+
+                message.textContent =
+                    "❌ Sunucuya bağlanılamadı.";
+
+            }
+        );
+
+        // ========================================
         // ODA OLUŞTUR
-        // =========================
+        // ========================================
 
         createRoomButton.addEventListener(
             "click",
             () => {
+
+                console.log(
+                    "ODA OLUŞTUR BUTONUNA BASILDI"
+                );
 
                 const username =
                     usernameInput.value.trim();
@@ -191,29 +230,64 @@
                     "createRoom",
                     username
                 );
-
             }
         );
 
-
-        // =========================
+        // ========================================
         // ODAYA KATIL
-        // =========================
+        // ========================================
 
         joinRoomButton.addEventListener(
             "click",
             () => {
 
+                console.log(
+                    "================================="
+                );
+
+                console.log(
+                    "OYUNA KATIL BUTONUNA BASILDI"
+                );
+
                 const username =
                     usernameInput.value.trim();
 
                 const roomCode =
-                    roomCodeInput.value.trim();
+                    roomCodeInput.value
+                        .trim()
+                        .toUpperCase();
 
-                if (!username || !roomCode) {
+                console.log(
+                    "USERNAME:",
+                    username
+                );
+
+                console.log(
+                    "ROOM CODE:",
+                    roomCode
+                );
+
+                console.log(
+                    "SOCKET:",
+                    socket.id
+                );
+
+                console.log(
+                    "================================="
+                );
+
+                if (!username) {
 
                     message.textContent =
-                        "Kullanıcı adı ve oda kodu gerekli.";
+                        "Kullanıcı adını yaz.";
+
+                    return;
+                }
+
+                if (!roomCode) {
+
+                    message.textContent =
+                        "Oda kodunu yaz.";
 
                     return;
                 }
@@ -221,69 +295,128 @@
                 socket.emit(
                     "joinRoom",
                     {
-                        username: username,
-                        roomCode: roomCode
+                        username:
+                            username,
+
+                        roomCode:
+                            roomCode
+                    },
+                    response => {
+
+                        console.log(
+                            "JOIN SERVER CEVABI:",
+                            response
+                        );
+
+                        if (
+                            !response ||
+                            !response.success
+                        ) {
+
+                            message.textContent =
+                                "❌ " +
+                                (
+                                    response?.message ||
+                                    "Odaya katılamadın."
+                                );
+
+                            return;
+                        }
+
+                        console.log(
+                            "✅ ODAYA BAŞARIYLA KATILINDI"
+                        );
+
+                        localStorage.setItem(
+                            "roomCode",
+                            response.roomCode
+                        );
+
+                        localStorage.setItem(
+                            "playerToken",
+                            response.token
+                        );
+
+                        currentRoom.textContent =
+                            "Oda kodu: " +
+                            response.roomCode;
+
+                        message.textContent =
+                            "✅ Odaya başarıyla katıldın!";
+
+                        startGameButton.style.display =
+                            "none";
                     }
+                );
+            }
+        );
+
+        // ========================================
+        // ODA OLUŞTURULDU
+        // ========================================
+
+        socket.on(
+            "roomCreated",
+            data => {
+
+                console.log(
+                    "ODA OLUŞTURULDU:",
+                    data
+                );
+
+                localStorage.setItem(
+                    "roomCode",
+                    data.roomCode
+                );
+
+                localStorage.setItem(
+                    "playerToken",
+                    data.token
+                );
+
+                currentRoom.textContent =
+                    "Oda kodu: " +
+                    data.roomCode;
+
+                roomCodeInput.value =
+                    data.roomCode;
+
+                message.textContent =
+                    "✅ Oda oluşturuldu!";
+
+                startGameButton.style.display =
+                    "block";
+            }
+        );
+
+        // ========================================
+        // ODAYA KATILINDI
+        // ========================================
+
+        socket.on(
+            "joinedRoom",
+            data => {
+
+                console.log(
+                    "ODAYA KATILINDI:",
+                    data
                 );
 
             }
         );
 
-
-        // =========================
-        // ODA OLUŞTURULDU
-        // =========================
-
-        socket.on(
-            "roomCreated",
-            (roomCode) => {
-
-                currentRoom.textContent =
-                    "Oda kodu: " + roomCode;
-
-                message.textContent =
-                    "Oda başarıyla oluşturuldu!";
-
-                roomCodeInput.value =
-                    roomCode;
-
-                // Host olduğu için göster
-                startGameButton.style.display =
-                    "block";
-
-            }
-        );
-
-
-        // =========================
-        // ODAYA KATILINDI
-        // =========================
-
-        socket.on(
-            "joinedRoom",
-            (roomCode) => {
-
-                currentRoom.textContent =
-                    "Oda kodu: " + roomCode;
-
-                message.textContent =
-                    "Odaya katıldın!";
-
-                // Normal oyuncu olduğu için gizle
-                startGameButton.style.display =
-                    "none";
-
-            }
-        );
-
-
-        // =========================
+        // ========================================
         // OYUNCU LİSTESİ
-        // =========================
+        // ========================================
 
         socket.on(
-            "playerList",
-            (players) => {
+            "gamePlayers",
+            players => {
+
+                console.log(
+                    "OYUNCU LİSTESİ GELDİ:",
+                    players
+                );
 
                 playerList.innerHTML = "";
 
@@ -291,174 +424,203 @@
                     players.length;
 
                 players.forEach(
-                    (player) => {
+                    player => {
 
                         const li =
-                            document.createElement("li");
+                            document.createElement(
+                                "li"
+                            );
 
-                        li.textContent =
-                            player.username;
+                        if (
+                            player.alive
+                        ) {
 
-                        playerList.appendChild(li);
+                            li.textContent =
+                                "🟢 " +
+                                player.username;
 
+                        } else {
+
+                            li.textContent =
+                                "💀 " +
+                                player.username;
+                        }
+
+                        playerList.appendChild(
+                            li
+                        );
                     }
                 );
-
             }
         );
 
-
-        // =========================
-        // YENİ HOST
-        // =========================
+        // ========================================
+        // HOST
+        // ========================================
 
         socket.on(
             "newHost",
-            (hostId) => {
+            () => {
 
-                if (socket.id === hostId) {
+                console.log(
+                    "YENİ HOST BENİM"
+                );
 
-                    startGameButton.style.display =
-                        "block";
+                startGameButton.style.display =
+                    "block";
 
-                    message.textContent =
-                        "Oda sahibi artık sensin.";
-
-                }
-
+                message.textContent =
+                    "Artık oda sahibisin.";
             }
         );
 
-
-        // =========================
+        // ========================================
         // OYUNU BAŞLAT
-        // =========================
+        // ========================================
 
         startGameButton.addEventListener(
             "click",
             () => {
 
+                console.log(
+                    "OYUNU BAŞLAT BASILDI"
+                );
+
                 socket.emit(
                     "startGame"
                 );
-
             }
         );
 
-
-        // =========================
+        // ========================================
         // OYUN BAŞLADI
-        // =========================
+        // ========================================
 
-        socket.on("gameStarted", (data) => {
+        socket.on(
+            "gameStarted",
+            data => {
 
-    localStorage.setItem(
-        "gameData",
-        JSON.stringify(data)
-    );
+                console.log(
+                    "OYUN BAŞLADI:",
+                    data
+                );
 
-    window.location.href =
-        "/game.html";
+                localStorage.setItem(
+                    "gameData",
+                    JSON.stringify(data)
+                );
 
-});
+                localStorage.setItem(
+                    "roomCode",
+                    data.roomCode
+                );
 
+                window.location.href =
+                    "/game.html";
+            }
+        );
 
-        // =========================
+        // ========================================
         // OYUN HATASI
-        // =========================
+        // ========================================
 
         socket.on(
             "gameError",
-            (error) => {
+            error => {
+
+                console.log(
+                    "GAME ERROR:",
+                    error
+                );
 
                 message.textContent =
                     error;
-
             }
         );
 
+        // ========================================
+        // ODA HATASI
+        // ========================================
 
-        // =========================
-        // CHAT GÖNDER
-        // =========================
+        socket.on(
+            "roomError",
+            error => {
+
+                console.log(
+                    "ROOM ERROR:",
+                    error
+                );
+
+                message.textContent =
+                    "❌ " + error;
+            }
+        );
+
+        // ========================================
+        // CHAT
+        // ========================================
 
         sendButton.addEventListener(
             "click",
-            () => {
-
-                const text =
-                    messageInput.value.trim();
-
-                if (text === "") {
-                    return;
-                }
-
-                socket.emit(
-                    "chatMessage",
-                    text
-                );
-
-                messageInput.value = "";
-
-            }
+            sendMessage
         );
-
-
-        // ENTER İLE CHAT
 
         messageInput.addEventListener(
             "keydown",
-            (event) => {
+            event => {
 
-                if (event.key === "Enter") {
-
-                    sendButton.click();
-
+                if (
+                    event.key ===
+                    "Enter"
+                ) {
+                    sendMessage();
                 }
-
             }
         );
 
+        function sendMessage() {
 
-        // =========================
-        // CHAT AL
-        // =========================
+            const text =
+                messageInput.value.trim();
+
+            if (!text) {
+                return;
+            }
+
+            socket.emit(
+                "chatMessage",
+                text
+            );
+
+            messageInput.value = "";
+        }
+
+        // ========================================
+        // CHAT MESAJI
+        // ========================================
 
         socket.on(
             "chatMessage",
-            (data) => {
+            data => {
 
-                const newMessage =
-                    document.createElement("p");
+                const p =
+                    document.createElement(
+                        "p"
+                    );
 
-                newMessage.textContent =
+                p.textContent =
                     data.username +
                     ": " +
                     data.message;
 
-                messages.appendChild(
-                    newMessage
-                );
-
-            }
-        );
-
-
-        // =========================
-        // ODA HATASI
-        // =========================
-
-        socket.on(
-            "roomError",
-            (error) => {
-
-                message.textContent =
-                    error;
-
+                messages.appendChild(p);
             }
         );
 
     </script>
+    <link rel="stylesheet" href="/public/style.css">
+<script src="/public/client.js" defer></script>
+
 
 </body>
 
