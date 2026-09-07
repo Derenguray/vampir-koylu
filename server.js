@@ -6,10 +6,18 @@ const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
 
-app.use(express.static(__dirname));
+app.use(express.static("public"));
 
 app.get("/", (req, res) => {
     res.sendFile(__dirname + "/index.html");
+});
+
+app.get("/lobby.html", (req, res) => {
+    res.sendFile(__dirname + "/lobby.html");
+});
+
+app.get("/game.html", (req, res) => {
+    res.sendFile(__dirname + "/game.html");
 });
 
 
@@ -1602,4 +1610,3 @@ server.listen(PORT, () => {
     console.log("Port:", PORT);
     console.log("=================================");
 });
-
