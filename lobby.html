@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="tr">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vampir Köylü - Lobi</title>
+    <link rel="stylesheet" href="/style.css">
+</head>
+
+<body>
+    <main class="box lobby-page">
+        <h1>🧛 Vampir Köylü</h1>
+        <h2>🏠 Lobi</h2>
+        <h3 id="currentRoom">Oda</h3>
+        <p>Oyuncu sayısı: <span id="playerCount">0</span></p>
+        <ul id="playerList"></ul>
+
+        <button id="startGameButton" style="display: none;">🎮 Oyunu Başlat</button>
+        <p id="message"></p>
+
+        <hr>
+
+        <h2>💬 Chat</h2>
+        <div id="messages" class="messages"></div>
+        <input id="messageInput" type="text" placeholder="Mesaj yaz..." maxlength="300">
+        <button id="sendButton">Gönder</button>
+
+        <button class="secondary-button" id="leaveButton">Ana Menü</button>
+    </main>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        const socket = io();
+        const roomCode = localStorage.getItem("roomCode");
+        const token = localStorage.getItem("playerToken");
+        const currentRoom = document.getElementById("currentRoom");
+        const playerList = document.getElementById("playerList");
+        const playerCount = document.getElementById("playerCount");
+        const startGameButton = document.getElementById("startGameButton");
+        const message = document.getElementById("message");
+        const messages = document.getElementById("messages");
+        const messageInput = document.getElementById("messageInput");
+
+        if (!roomCode || !token) {
+            window.location.href = "/";
+        } else {
+            currentRoom.textContent = "Oda kodu: " + roomCode;
+        }
+
+        socket.on("connect", () => {
+            if (roomCode && token) {
+                socket.emit("requestGameState", { roomCode, token });
+            }
+        });
+
+        socket.on("gamePlayers", players => {
+            playerCount.textContent = players.length;
+            playerList.innerHTML = "";
+
+            players.forEach(player => {
+                const item = document.createElement("li");
+                item.textContent = (player.alive ? "🟢 " : "💀 ") + player.username;
+                playerList.appendChild(item);
+            });
+        });
+
+        socket.on("roomError", error => {
+            message.textContent = "❌ " + error;
+        });
+
+        socket.on("newHost", () => {
+            startGameButton.style.display = "block";
+            message.textContent = "Artık oda sahibisin.";
+        });
+
+        socket.on("gameStarted", data => {
+            localStorage.setItem("gameData", JSON.stringify(data));
+            localStorage.setItem("roomCode", data.roomCode);
+            window.location.href = "/game.html";
+        });
+
+        startGameButton.addEventListener("click", () => {
+            socket.emit("startGame");
+        });
+
+        function sendMessage() {
+            const text = messageInput.value.trim();
+            if (!text) {
+                return;
+            }
+
+            socket.emit("chatMessage", text);
+            messageInput.value = "";
+        }
+
+        document.getElementById("sendButton").addEventListener("click", sendMessage);
+        messageInput.addEventListener("keydown", event => {
+            if (event.key === "Enter") {
+                sendMessage();
+            }
+        });
+
+        socket.on("chatMessage", data => {
+            const item = document.createElement("p");
+            item.textContent = data.username + ": " + data.message;
+            messages.appendChild(item);
+            messages.scrollTop = messages.scrollHeight;
+        });
+
+        document.getElementById("leaveButton").addEventListener("click", () => {
+            localStorage.removeItem("roomCode");
+            localStorage.removeItem("playerToken");
+            localStorage.removeItem("gameData");
+            window.location.href = "/";
+        });
+    </script>
+</body>
+
+</html>
