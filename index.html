@@ -2,7 +2,6 @@
 <html lang="tr">
 
 <head>
-
     <meta charset="UTF-8">
 
     <meta
@@ -10,82 +9,86 @@
         content="width=device-width, initial-scale=1.0"
     >
 
-    <title>Vampir Köylü - Oyun</title>
-    <link rel="stylesheet" href="/style.css">
-
+    <title>Vampir Köylü</title>
 </head>
 
 <body>
 
-    <main class="game-page">
-        <h1>🧛 Vampir Köylü</h1>
-        <p class="page-flow">Oyuna Katıl <span>›</span> Lobi & Chat <span>›</span> Oynanış & Chat</p>
+    <h1>🧛 Vampir Köylü</h1>
 
-        <section class="game-layout">
-            <div class="game-panel">
-                <h2 id="roleText">
-                    Rol: -
-                </h2>
+    <h2>Oyuna Katıl</h2>
 
-                <h2 id="phaseText">
-                    Faz: -
-                </h2>
+    <input
+        id="username"
+        type="text"
+        placeholder="Kullanıcı adın"
+    >
 
-                <h1 id="timer">
-                    00
-                </h1>
+    <br>
+    <br>
 
-                <hr>
+    <button id="createRoom">
+        Oda Oluştur
+    </button>
 
-                <h2>Oyuncular</h2>
-                <ul id="playerList"></ul>
+    <br>
+    <br>
 
-                <hr>
+    <input
+        id="roomCode"
+        type="text"
+        placeholder="Oda kodu"
+    >
 
-                <div id="nightArea">
+    <button id="joinRoom">
+        Odaya Katıl
+    </button>
 
-                    <h2>🌙 Gece</h2>
+    <p id="message"></p>
 
-                    <p id="nightInfo"></p>
+    <hr>
 
-                    <div id="nightPlayers"></div>
+    <h2>🏠 Lobi</h2>
 
-                </div>
+    <h3 id="currentRoom">
+        Henüz bir odaya girmedin.
+    </h3>
 
-                <div id="votingArea">
+    <h3>
+        Oyuncu sayısı:
+        <span id="playerCount">0</span>
+    </h3>
 
-                    <h2>⚖️ Oylama</h2>
+    <h3>Oyuncular</h3>
 
-                    <p>
-                        Kimi asmak istiyorsun?
-                    </p>
+    <ul id="playerList"></ul>
 
-                    <div id="votingPlayers"></div>
-                </div>
+    <br>
 
-                <div id="resultArea">
+    <button
+        id="startGameButton"
+        style="display: none;"
+    >
+        🎮 Oyunu Başlat
+    </button>
 
-                    <h2>📢 Sonuç</h2>
+    <hr>
 
-                    <p id="resultText"></p>
-                </div>
+    <h3>💬 Chat</h3>
 
-                <div id="gameOverArea">
+    <div id="messages"></div>
 
-                    <h2 id="winnerText"></h2>
-                </div>
-            </div>
+    <br>
 
-            <aside class="chat-panel">
-                <h2>💬 Oyun Chat'i</h2>
-                <div id="messages" class="messages"></div>
-                <input id="messageInput" type="text" placeholder="Mesaj yaz..." maxlength="300">
-                <button id="sendButton">Gönder</button>
-            </aside>
-        </section>
+    <input
+        id="messageInput"
+        type="text"
+        placeholder="Mesaj yaz..."
+    >
 
-        <button class="secondary-button" id="leaveButton">Ana Menü</button>
-    </main>
+    <button id="sendButton">
+        Gönder
+    </button>
 
     <script src="/socket.io/socket.io.js"></script>
 
@@ -97,27 +100,42 @@
 
         const socket = io();
 
-        let myRole = null;
-        let myUsername = null;
-        let roomCode = null;
+        console.log(
+            "INDEX SOCKET OLUŞTURULDU"
+        );
 
         // ========================================
         // ELEMENTLER
         // ========================================
 
-        const roleText =
+        const usernameInput =
             document.getElementById(
-                "roleText"
+                "username"
             );
 
-        const phaseText =
+        const roomCodeInput =
             document.getElementById(
-                "phaseText"
+                "roomCode"
             );
 
-        const timer =
+        const createRoomButton =
             document.getElementById(
-                "timer"
+                "createRoom"
+            );
+
+        const joinRoomButton =
+            document.getElementById(
+                "joinRoom"
+            );
+
+        const message =
+            document.getElementById(
+                "message"
+            );
+
+        const currentRoom =
+            document.getElementById(
+                "currentRoom"
             );
 
         const playerList =
@@ -125,66 +143,30 @@
                 "playerList"
             );
 
-        const nightArea =
+        const playerCount =
             document.getElementById(
-                "nightArea"
+                "playerCount"
             );
 
-        const nightInfo =
+        const startGameButton =
             document.getElementById(
-                "nightInfo"
+                "startGameButton"
             );
 
-        const nightPlayers =
+        const messageInput =
             document.getElementById(
-                "nightPlayers"
+                "messageInput"
             );
 
-        const votingArea =
+        const sendButton =
             document.getElementById(
-                "votingArea"
+                "sendButton"
             );
 
-        const votingPlayers =
+        const messages =
             document.getElementById(
-                "votingPlayers"
+                "messages"
             );
-
-        const resultArea =
-            document.getElementById(
-                "resultArea"
-            );
-
-        const resultText =
-            document.getElementById(
-                "resultText"
-            );
-
-        const gameOverArea =
-            document.getElementById(
-                "gameOverArea"
-            );
-
-        const winnerText =
-            document.getElementById(
-                "winnerText"
-            );
-
-        // ========================================
-        // BAŞLANGIÇ
-        // ========================================
-
-        nightArea.style.display =
-            "none";
-
-        votingArea.style.display =
-            "none";
-
-        resultArea.style.display =
-            "none";
-
-        gameOverArea.style.display =
-            "none";
 
         // ========================================
         // SOCKET BAĞLANDI
@@ -195,81 +177,236 @@
             () => {
 
                 console.log(
-                    "GAME SOCKET BAĞLANDI:",
+                    "INDEX SOCKET BAĞLANDI:",
                     socket.id
                 );
 
-                roomCode =
-                    localStorage.getItem(
-                        "roomCode"
-                    );
-
-                const token =
-                    localStorage.getItem(
-                        "playerToken"
-                    );
-
-                if (
-                    roomCode &&
-                    token
-                ) {
-
-                    socket.emit(
-                        "requestGameState",
-                        {
-                            roomCode:
-                                roomCode,
-
-                            token:
-                                token
-                        }
-                    );
-                } else {
-                    window.location.href = "/";
-                }
             }
         );
 
         // ========================================
-        // OYUN BAŞLADI
+        // SOCKET HATASI
         // ========================================
 
         socket.on(
-            "gameStarted",
+            "connect_error",
+            error => {
+
+                console.error(
+                    "SOCKET BAĞLANTI HATASI:",
+                    error
+                );
+
+                message.textContent =
+                    "❌ Sunucuya bağlanılamadı.";
+
+            }
+        );
+
+        // ========================================
+        // ODA OLUŞTUR
+        // ========================================
+
+        createRoomButton.addEventListener(
+            "click",
+            () => {
+
+                console.log(
+                    "ODA OLUŞTUR BUTONUNA BASILDI"
+                );
+
+                const username =
+                    usernameInput.value.trim();
+
+                if (!username) {
+
+                    message.textContent =
+                        "Önce kullanıcı adını yaz.";
+
+                    return;
+                }
+
+                socket.emit(
+                    "createRoom",
+                    username
+                );
+            }
+        );
+
+        // ========================================
+        // ODAYA KATIL
+        // ========================================
+
+        joinRoomButton.addEventListener(
+            "click",
+            () => {
+
+                console.log(
+                    "================================="
+                );
+
+                console.log(
+                    "OYUNA KATIL BUTONUNA BASILDI"
+                );
+
+                const username =
+                    usernameInput.value.trim();
+
+                const roomCode =
+                    roomCodeInput.value
+                        .trim()
+                        .toUpperCase();
+
+                console.log(
+                    "USERNAME:",
+                    username
+                );
+
+                console.log(
+                    "ROOM CODE:",
+                    roomCode
+                );
+
+                console.log(
+                    "SOCKET:",
+                    socket.id
+                );
+
+                console.log(
+                    "================================="
+                );
+
+                if (!username) {
+
+                    message.textContent =
+                        "Kullanıcı adını yaz.";
+
+                    return;
+                }
+
+                if (!roomCode) {
+
+                    message.textContent =
+                        "Oda kodunu yaz.";
+
+                    return;
+                }
+
+                socket.emit(
+                    "joinRoom",
+                    {
+                        username:
+                            username,
+
+                        roomCode:
+                            roomCode
+                    },
+                    response => {
+
+                        console.log(
+                            "JOIN SERVER CEVABI:",
+                            response
+                        );
+
+                        if (
+                            !response ||
+                            !response.success
+                        ) {
+
+                            message.textContent =
+                                "❌ " +
+                                (
+                                    response?.message ||
+                                    "Odaya katılamadın."
+                                );
+
+                            return;
+                        }
+
+                        console.log(
+                            "✅ ODAYA BAŞARIYLA KATILINDI"
+                        );
+
+                        localStorage.setItem(
+                            "roomCode",
+                            response.roomCode
+                        );
+
+                        localStorage.setItem(
+                            "playerToken",
+                            response.token
+                        );
+
+                        currentRoom.textContent =
+                            "Oda kodu: " +
+                            response.roomCode;
+
+                        message.textContent =
+                            "✅ Odaya başarıyla katıldın!";
+
+                        startGameButton.style.display =
+                            "none";
+                    }
+                );
+            }
+        );
+
+        // ========================================
+        // ODA OLUŞTURULDU
+        // ========================================
+
+        socket.on(
+            "roomCreated",
             data => {
 
                 console.log(
-                    "GAME STARTED:",
+                    "ODA OLUŞTURULDU:",
                     data
-                );
-
-                myUsername =
-                    data.username;
-
-                myRole =
-                    data.role;
-
-                roomCode =
-                    data.roomCode;
-
-                localStorage.setItem(
-                    "gameData",
-                    JSON.stringify(data)
                 );
 
                 localStorage.setItem(
                     "roomCode",
-                    roomCode
+                    data.roomCode
                 );
 
-                roleText.textContent =
-                    "Rolün: " +
-                    myRole;
+                localStorage.setItem(
+                    "playerToken",
+                    data.token
+                );
+
+                currentRoom.textContent =
+                    "Oda kodu: " +
+                    data.roomCode;
+
+                roomCodeInput.value =
+                    data.roomCode;
+
+                message.textContent =
+                    "✅ Oda oluşturuldu!";
+
+                startGameButton.style.display =
+                    "block";
             }
         );
 
         // ========================================
-        // OYUNCULAR
+        // ODAYA KATILINDI
+        // ========================================
+
+        socket.on(
+            "joinedRoom",
+            data => {
+
+                console.log(
+                    "ODAYA KATILINDI:",
+                    data
+                );
+
+            }
+        );
+
+        // ========================================
+        // OYUNCU LİSTESİ
         // ========================================
 
         socket.on(
@@ -277,12 +414,14 @@
             players => {
 
                 console.log(
-                    "GAME PLAYERS:",
+                    "OYUNCU LİSTESİ GELDİ:",
                     players
                 );
 
-                playerList.innerHTML =
-                    "";
+                playerList.innerHTML = "";
+
+                playerCount.textContent =
+                    players.length;
 
                 players.forEach(
                     player => {
@@ -316,543 +455,86 @@
         );
 
         // ========================================
-        // FAZ
+        // HOST
         // ========================================
 
         socket.on(
-            "phaseChanged",
+            "newHost",
+            () => {
+
+                console.log(
+                    "YENİ HOST BENİM"
+                );
+
+                startGameButton.style.display =
+                    "block";
+
+                message.textContent =
+                    "Artık oda sahibisin.";
+            }
+        );
+
+        // ========================================
+        // OYUNU BAŞLAT
+        // ========================================
+
+        startGameButton.addEventListener(
+            "click",
+            () => {
+
+                console.log(
+                    "OYUNU BAŞLAT BASILDI"
+                );
+
+                socket.emit(
+                    "startGame"
+                );
+            }
+        );
+
+        // ========================================
+        // OYUN BAŞLADI
+        // ========================================
+
+        socket.on(
+            "gameStarted",
             data => {
 
                 console.log(
-                    "PHASE:",
+                    "OYUN BAŞLADI:",
                     data
                 );
 
-                phaseText.textContent =
-                    "Faz: " +
-                    getPhaseName(
-                        data.phase
-                    );
-
-                startTimer(
-                    data.endTime
+                localStorage.setItem(
+                    "gameData",
+                    JSON.stringify(data)
                 );
 
-                if (
-                    data.phase ===
-                    "night"
-                ) {
-
-                    nightArea.style.display =
-                        "block";
-
-                    votingArea.style.display =
-                        "none";
-
-                } else if (
-                    data.phase ===
-                    "discussion"
-                ) {
-
-                    nightArea.style.display =
-                        "none";
-
-                    votingArea.style.display =
-                        "none";
-
-                } else if (
-                    data.phase ===
-                    "voting"
-                ) {
-
-                    nightArea.style.display =
-                        "none";
-
-                    votingArea.style.display =
-                        "block";
-                }
-            }
-        );
-
-        // ========================================
-        // FAZ İSMİ
-        // ========================================
-
-        function getPhaseName(phase) {
-
-            if (
-                phase ===
-                "night"
-            ) {
-                return "🌙 Gece";
-            }
-
-            if (
-                phase ===
-                "discussion"
-            ) {
-                return "☀️ Tartışma";
-            }
-
-            if (
-                phase ===
-                "voting"
-            ) {
-                return "⚖️ Oylama";
-            }
-
-            if (
-                phase ===
-                "gameover"
-            ) {
-                return "🏆 Oyun Bitti";
-            }
-
-            return phase;
-        }
-
-        // ========================================
-        // TIMER
-        // ========================================
-
-        let timerInterval = null;
-
-        function startTimer(endTime) {
-
-            if (timerInterval) {
-                clearInterval(
-                    timerInterval
-                );
-            }
-
-            function updateTimer() {
-
-                const remaining =
-                    Math.max(
-                        0,
-                        Math.ceil(
-                            (
-                                endTime -
-                                Date.now()
-                            ) / 1000
-                        )
-                    );
-
-                timer.textContent =
-                    String(
-                        remaining
-                    ).padStart(
-                        2,
-                        "0"
-                    );
-
-                if (
-                    remaining <= 0
-                ) {
-
-                    clearInterval(
-                        timerInterval
-                    );
-                }
-            }
-
-            updateTimer();
-
-            timerInterval =
-                setInterval(
-                    updateTimer,
-                    250
-                );
-        }
-
-        // ========================================
-        // GECE BAŞLADI
-        // ========================================
-
-        socket.on(
-            "nightStarted",
-            data => {
-
-                myRole =
-                    data.role;
-
-                roleText.textContent =
-                    "Rolün: " +
-                    myRole;
-
-                nightArea.style.display =
-                    "block";
-
-                votingArea.style.display =
-                    "none";
-
-                nightPlayers.innerHTML =
-                    "";
-
-                if (
-                    myRole ===
-                    "Vampir"
-                ) {
-
-                    nightInfo.textContent =
-                        "Bir oyuncu seç ve öldür.";
-
-                } else if (
-                    myRole ===
-                    "Doktor"
-                ) {
-
-                    nightInfo.textContent =
-                        "Bir oyuncu seç ve kurtar.";
-
-                } else if (
-                    myRole ===
-                    "Dedektif"
-                ) {
-
-                    nightInfo.textContent =
-                        "Bir oyuncunun vampir olup olmadığını kontrol et.";
-
-                } else {
-
-                    nightInfo.textContent =
-                        "Bu gece özel bir yeteneğin yok.";
-                }
-
-                createNightButtons();
-            }
-        );
-
-        // ========================================
-        // GECE BUTONLARI
-        // ========================================
-
-        function createNightButtons() {
-
-            nightPlayers.innerHTML =
-                "";
-
-            const players =
-                Array.from(
-                    playerList.children
+                localStorage.setItem(
+                    "roomCode",
+                    data.roomCode
                 );
 
-            players.forEach(
-                li => {
-
-                    const username =
-                        li.textContent
-                            .replace("🟢 ", "")
-                            .replace("💀 ", "")
-                            .trim();
-
-                    if (
-                        !username ||
-                        username ===
-                        myUsername
-                    ) {
-                        return;
-                    }
-
-                    if (
-                        li.textContent.includes(
-                            "💀"
-                        )
-                    ) {
-                        return;
-                    }
-
-                    const button =
-                        document.createElement(
-                            "button"
-                        );
-
-                    button.textContent =
-                        username;
-
-                    button.style.margin =
-                        "5px";
-
-                    button.addEventListener(
-                        "click",
-                        () => {
-
-                            const player =
-                                currentPlayers.find(
-                                    p =>
-                                        p.username ===
-                                        username
-                                );
-
-                            if (!player) {
-                                return;
-                            }
-
-                            if (
-                                myRole ===
-                                "Vampir"
-                            ) {
-
-                                socket.emit(
-                                    "vampireKill",
-                                    player.id
-                                );
-
-                            } else if (
-                                myRole ===
-                                "Doktor"
-                            ) {
-
-                                socket.emit(
-                                    "doctorSave",
-                                    player.id
-                                );
-
-                            } else if (
-                                myRole ===
-                                "Dedektif"
-                            ) {
-
-                                socket.emit(
-                                    "detectiveCheck",
-                                    player.id
-                                );
-                            }
-                        }
-                    );
-
-                    nightPlayers.appendChild(
-                        button
-                    );
-                }
-            );
-        }
+                window.location.href =
+                    "/game.html";
+            }
+        );
 
         // ========================================
-        // OYUNCULARI TUT
+        // OYUN HATASI
         // ========================================
-
-        let currentPlayers = [];
 
         socket.on(
-            "gamePlayers",
-            players => {
+            "gameError",
+            error => {
 
-                currentPlayers =
-                    players;
-
-                playerList.innerHTML =
-                    "";
-
-                players.forEach(
-                    player => {
-
-                        const li =
-                            document.createElement(
-                                "li"
-                            );
-
-                        li.textContent =
-                            player.alive
-                                ? "🟢 " +
-                                  player.username
-                                : "💀 " +
-                                  player.username;
-
-                        playerList.appendChild(
-                            li
-                        );
-                    }
+                console.log(
+                    "GAME ERROR:",
+                    error
                 );
 
-                if (
-                    myRole &&
-                    phaseText.textContent.includes(
-                        "Gece"
-                    )
-                ) {
-                    createNightButtons();
-                }
-            }
-        );
-
-        // ========================================
-        // OYLAMA BAŞLADI
-        // ========================================
-
-        socket.on(
-            "votingStarted",
-            () => {
-
-                votingArea.style.display =
-                    "block";
-
-                nightArea.style.display =
-                    "none";
-
-                votingPlayers.innerHTML =
-                    "";
-
-                currentPlayers.forEach(
-                    player => {
-
-                        if (
-                            !player.alive ||
-                            player.username ===
-                            myUsername
-                        ) {
-                            return;
-                        }
-
-                        const button =
-                            document.createElement(
-                                "button"
-                            );
-
-                        button.textContent =
-                            "⚖️ " +
-                            player.username;
-
-                        button.style.margin =
-                            "5px";
-
-                        button.addEventListener(
-                            "click",
-                            () => {
-
-                                socket.emit(
-                                    "vote",
-                                    player.id
-                                );
-                            }
-                        );
-
-                        votingPlayers.appendChild(
-                            button
-                        );
-                    }
-                );
-            }
-        );
-
-        // ========================================
-        // AKSİYON ONAYI
-        // ========================================
-
-        socket.on(
-            "actionConfirmed",
-            message => {
-
-                alert(message);
-            }
-        );
-
-        // ========================================
-        // GECE SONUCU
-        // ========================================
-
-        socket.on(
-            "nightResult",
-            data => {
-
-                resultArea.style.display =
-                    "block";
-
-                if (
-                    data.killed
-                ) {
-
-                    resultText.textContent =
-                        "🌙 Gece " +
-                        data.killed +
-                        " öldürüldü.";
-
-                } else {
-
-                    resultText.textContent =
-                        "🌙 Bu gece kimse ölmedi.";
-                }
-            }
-        );
-
-        // ========================================
-        // İDAM SONUCU
-        // ========================================
-
-        socket.on(
-            "executionResult",
-            data => {
-
-                resultArea.style.display =
-                    "block";
-
-                if (
-                    data.executed
-                ) {
-
-                    resultText.textContent =
-                        "⚖️ " +
-                        data.executed +
-                        " asıldı. Rolü: " +
-                        data.role +
-                        " (" +
-                        data.votes +
-                        " oy)";
-
-                } else {
-
-                    resultText.textContent =
-                        data.message;
-                }
-            }
-        );
-
-        // ========================================
-        // DEDEKTİF SONUCU
-        // ========================================
-
-        socket.on(
-            "detectiveResult",
-            data => {
-
-                alert(
-                    data.username +
-                    " → " +
-                    (
-                        data.isVampire
-                            ? "🧛 VAMPİR"
-                            : "🟢 VAMPİR DEĞİL"
-                    )
-                );
-            }
-        );
-
-        // ========================================
-        // OYUN BİTTİ
-        // ========================================
-
-        socket.on(
-            "gameOver",
-            data => {
-
-                phaseText.textContent =
-                    "🏆 Oyun Bitti";
-
-                timer.textContent =
-                    "00";
-
-                nightArea.style.display =
-                    "none";
-
-                votingArea.style.display =
-                    "none";
-
-                gameOverArea.style.display =
-                    "block";
-
-                winnerText.textContent =
-                    "🏆 Kazanan: " +
-                    data.winner;
+                message.textContent =
+                    error;
             }
         );
 
@@ -864,52 +546,83 @@
             "roomError",
             error => {
 
-                console.error(
+                console.log(
                     "ROOM ERROR:",
                     error
                 );
 
-                alert(
-                    "❌ " + error
-                );
+                message.textContent =
+                    "❌ " + error;
+            }
+        );
+
+        // ========================================
+        // CHAT
+        // ========================================
+
+        sendButton.addEventListener(
+            "click",
+            sendMessage
+        );
+
+        messageInput.addEventListener(
+            "keydown",
+            event => {
+
+                if (
+                    event.key ===
+                    "Enter"
+                ) {
+                    sendMessage();
+                }
             }
         );
 
         function sendMessage() {
-            const messageInput = document.getElementById("messageInput");
-            const text = messageInput.value.trim();
+
+            const text =
+                messageInput.value.trim();
 
             if (!text) {
                 return;
             }
 
-            socket.emit("chatMessage", text);
+            socket.emit(
+                "chatMessage",
+                text
+            );
+
             messageInput.value = "";
         }
 
-        document.getElementById("sendButton").addEventListener("click", sendMessage);
-        document.getElementById("messageInput").addEventListener("keydown", event => {
-            if (event.key === "Enter") {
-                sendMessage();
+        // ========================================
+        // CHAT MESAJI
+        // ========================================
+
+        socket.on(
+            "chatMessage",
+            data => {
+
+                const p =
+                    document.createElement(
+                        "p"
+                    );
+
+                p.textContent =
+                    data.username +
+                    ": " +
+                    data.message;
+
+                messages.appendChild(p);
             }
-        });
-
-        socket.on("chatMessage", data => {
-            const item = document.createElement("p");
-            item.textContent = data.username + ": " + data.message;
-            document.getElementById("messages").appendChild(item);
-            document.getElementById("messages").scrollTop =
-                document.getElementById("messages").scrollHeight;
-        });
-
-        document.getElementById("leaveButton").addEventListener("click", () => {
-            localStorage.removeItem("roomCode");
-            localStorage.removeItem("playerToken");
-            localStorage.removeItem("gameData");
-            window.location.href = "/";
-        });
+        );
 
     </script>
+    <link rel="stylesheet" href="/style.css">
+
+<script src="/client.js" defer></script>
+
+
 
 </body>
 
