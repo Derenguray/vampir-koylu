@@ -1,121 +1,267 @@
 /* ============================
-   RETRO OYUN TEMA
+   VAMPIR KOYLU - RETRO ARCADE
    ============================ */
 
+:root {
+    --bg: #090b12;
+    --panel: #111827;
+    --panel-light: #182235;
+    --border: #34435f;
+    --red: #ff3864;
+    --red-dark: #9d183d;
+    --cyan: #38f5e4;
+    --yellow: #ffe66d;
+    --text: #e7f6ff;
+    --muted: #8da0b8;
+    --shadow: #03050a;
+}
+
+* {
+    box-sizing: border-box;
+}
+
 body {
-    background-color: #1b1b1b;
-    color: #e0e0e0;
+    min-height: 100vh;
+    margin: 0;
+    padding: 28px 16px;
+    overflow-x: hidden;
+    background:
+        linear-gradient(rgba(255, 255, 255, 0.025) 50%, transparent 50%),
+        radial-gradient(circle at 50% -10%, #29304d 0, var(--bg) 54%);
+    background-size: 100% 4px, 100% 100%;
+    color: var(--text);
     font-family: "Courier New", monospace;
     text-align: center;
-    padding: 20px;
 }
 
-/* Başlık */
+body::before {
+    position: fixed;
+    z-index: -1;
+    inset: 0;
+    background: repeating-linear-gradient(
+        90deg,
+        transparent 0,
+        transparent 3px,
+        rgba(56, 245, 228, 0.018) 4px
+    );
+    content: "";
+    pointer-events: none;
+}
+
+h1,
+h2,
+h3,
+p {
+    margin-top: 0;
+}
+
 h1 {
-    font-size: 32px;
-    color: #ff4d4d;
-    text-shadow: 2px 2px 0px #000;
-    margin-bottom: 20px;
+    margin-bottom: 12px;
+    color: var(--red);
+    font-size: clamp(28px, 5vw, 42px);
+    letter-spacing: 2px;
+    text-shadow: 3px 3px 0 var(--red-dark), 0 0 18px rgba(255, 56, 100, 0.45);
 }
 
-/* Kart görünümü */
+h2 {
+    color: var(--cyan);
+    font-size: 21px;
+    letter-spacing: 1px;
+    text-shadow: 0 0 8px rgba(56, 245, 228, 0.3);
+}
+
+h3 {
+    color: var(--yellow);
+}
+
+hr {
+    border: 0;
+    border-top: 2px dashed var(--border);
+    margin: 24px 0;
+}
+
+.box,
+.game-panel,
+.chat-panel {
+    background: linear-gradient(145deg, rgba(24, 34, 53, 0.97), rgba(10, 15, 27, 0.97));
+    border: 3px solid var(--border);
+    box-shadow:
+        6px 6px 0 var(--shadow),
+        0 0 22px rgba(56, 245, 228, 0.08);
+}
+
 .box {
-    background-color: #262626;
-    border: 2px solid #444;
-    padding: 20px;
-    margin: 20px auto;
-    width: 300px;
-    border-radius: 10px;
-    box-shadow: 0px 0px 10px #000;
+    width: min(440px, 100%);
+    margin: 28px auto;
+    padding: 28px 24px;
 }
 
-/* Input alanları */
+.lobby-page {
+    width: min(500px, 100%);
+}
+
+.game-page {
+    width: min(1120px, 100%);
+    margin: 0 auto;
+}
+
+.page-flow {
+    margin-bottom: 24px;
+    color: var(--muted);
+    font-size: 13px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+}
+
+.page-flow span {
+    padding: 0 8px;
+    color: var(--red);
+    font-size: 20px;
+}
+
+.game-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(280px, 350px);
+    gap: 24px;
+    align-items: start;
+    text-align: center;
+}
+
+.game-panel,
+.chat-panel {
+    padding: 24px;
+}
+
+.game-panel ul,
+.lobby-page ul {
+    padding: 0;
+    list-style: none;
+}
+
+.game-panel li,
+.lobby-page li {
+    margin: 8px auto;
+    padding: 10px 12px;
+    background: var(--panel-light);
+    border: 1px solid var(--border);
+    color: var(--text);
+}
+
+.chat-panel {
+    position: sticky;
+    top: 20px;
+}
+
+.chat-panel .messages {
+    height: 360px;
+}
+
 input {
-    width: 90%;
-    padding: 10px;
-    margin-top: 10px;
-    border: 2px solid #555;
-    border-radius: 6px;
-    background-color: #111;
-    color: #fff;
+    width: 100%;
+    margin-top: 12px;
+    padding: 12px 14px;
+    background: #080c15;
+    border: 2px solid var(--border);
+    border-radius: 0;
+    outline: 0;
+    color: var(--text);
+    font: inherit;
     font-size: 16px;
 }
 
-/* Retro buton */
+input:focus {
+    border-color: var(--cyan);
+    box-shadow: 0 0 10px rgba(56, 245, 228, 0.25);
+}
+
 button {
-    width: 95%;
-    padding: 12px;
-    margin-top: 15px;
-    background-color: #ff4d4d;
-    border: 2px solid #000;
-    border-radius: 8px;
+    width: 100%;
+    margin-top: 14px;
+    padding: 12px 16px;
+    background: var(--red);
+    border: 3px solid #57132e;
+    border-radius: 0;
+    box-shadow: 4px 4px 0 var(--shadow);
     color: #fff;
-    font-size: 18px;
-    font-weight: bold;
+    font: 700 16px "Courier New", monospace;
     cursor: pointer;
-    text-shadow: 1px 1px 0px #000;
-    transition: 0.2s;
+    text-shadow: 2px 2px 0 var(--red-dark);
+    transition: transform 0.1s, background-color 0.1s;
 }
 
 button:hover {
-    background-color: #ff1a1a;
-    transform: scale(1.05);
+    background: #ff5b7f;
+    transform: translate(-2px, -2px);
 }
 
-/* Oda kodu ve oyuncu listesi */
-#lobby {
-    margin-top: 30px;
+button:active {
+    box-shadow: 1px 1px 0 var(--shadow);
+    transform: translate(2px, 2px);
 }
 
-#playerList div {
-    background-color: #333;
-    padding: 8px;
-    margin: 5px auto;
-    width: 250px;
-    border-radius: 6px;
-    border: 1px solid #555;
-    color: #fff;
-    font-size: 16px;
+.secondary-button {
+    max-width: 300px;
+    background: #28344b;
+    border-color: #101827;
+    text-shadow: 2px 2px 0 #111827;
 }
 
-/* Chat kutusu */
-#chatBox {
-    background-color: #222;
-    border: 2px solid #444;
-    padding: 10px;
-    width: 300px;
-    margin: 20px auto;
-    border-radius: 10px;
+.secondary-button:hover {
+    background: #3b4d6e;
 }
 
-#chatMessages {
-    height: 150px;
+.messages {
+    height: 180px;
     overflow-y: auto;
-    background-color: #111;
-    padding: 10px;
-    border-radius: 6px;
-    border: 1px solid #333;
-    color: #ccc;
-    font-size: 14px;
+    padding: 12px;
+    background: #080c15;
+    border: 2px solid var(--border);
+    text-align: left;
+    scrollbar-color: var(--red) #080c15;
 }
 
-#chatInput {
-    width: 90%;
-    padding: 10px;
-    margin-top: 10px;
-    background-color: #111;
-    border: 2px solid #555;
-    border-radius: 6px;
-    color: #fff;
+.messages p {
+    margin: 0 0 8px;
+    padding-bottom: 7px;
+    border-bottom: 1px dotted #33405a;
+    color: var(--text);
+    overflow-wrap: anywhere;
 }
 
-#sendChatBtn {
-    background-color: #4d94ff;
-    border: 2px solid #000;
-    color: #fff;
-    margin-top: 10px;
+#timer {
+    color: var(--yellow);
+    font-size: 48px;
+    letter-spacing: 6px;
+    text-shadow: 3px 3px 0 #806d25, 0 0 14px rgba(255, 231, 109, 0.43);
 }
 
-#sendChatBtn:hover {
-    background-color: #1a75ff;
+#nightArea,
+#votingArea,
+#resultArea,
+#gameOverArea {
+    padding: 14px;
+    background: rgba(8, 12, 21, 0.55);
+    border: 1px solid var(--border);
+}
+
+#gameOverArea {
+    border-color: var(--yellow);
+}
+
+@media (max-width: 760px) {
+    body {
+        padding: 18px 10px;
+    }
+
+    .game-layout {
+        grid-template-columns: 1fr;
+    }
+
+    .chat-panel {
+        position: static;
+    }
+
+    .chat-panel .messages {
+        height: 220px;
+    }
 }
